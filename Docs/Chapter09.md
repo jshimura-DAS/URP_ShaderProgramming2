@@ -41,15 +41,13 @@ Chapter 08 の `OutlinePass.cs`（Execute 版）と、Chapter 09 の `OutlinePas
 
 ### 0.4 RenderGraphBlitUtil.cs を作成する
 
-2.4 で説明する `RenderGraphBlitUtil` は、Chapter 09 の `OutlinePass.cs` から呼び出されます。このクラスを定義したファイルが無いと、次のエラーが出ます。
+2.4 で説明する `RenderGraphBlitUtil` は、`OutlinePass.cs` と `WipeRendererFeature.cs` から呼び出されます。このクラスを定義したファイルが無いと、次のエラーが出ます。
 
 > CS0103：現在のコンテキストに 'RenderGraphBlitUtil' という名前は存在しません
 
 ファイル名は `RenderGraphBlitUtil.cs`、クラス名は `RenderGraphBlitUtil` と一致させます。保存先は `Assets/ShaderProgramming/Chapter09/` を推奨します。Unity は保存先フォルダにかかわらずスクリプトを認識するため、既に別のフォルダに作成している場合はそのままでも動きます。
 
 ### 0.5 最終的なファイル構成
-
-この章を終えた時点の Chapter 08・09 関連のファイルは次のとおりです。
 
 | ファイル | 場所 | 状態 |
 | :--- | :--- | :--- |
@@ -60,6 +58,7 @@ Chapter 08 の `OutlinePass.cs`（Execute 版）と、Chapter 09 の `OutlinePas
 | `OutlinePass.cs`（Execute 版） | Chapter08 | 削除（0.3） |
 | `EmptyRendererFeature.cs` | Chapter08 | 削除（0.2） |
 | `Dither08.shader` / `Stealth08.shader` / `StealthController.cs` | Chapter08 | 変更なし |
+| `Lambert09.shadergraph` | Chapter09 | 新規作成（8 章） |
 | `WipeFullscreen09.shader` / `WipeRendererFeature.cs` / `WipeController.cs` | Chapter09 | 新規作成（9 章） |
 
 ---
@@ -249,12 +248,39 @@ protected override void Dispose(bool disposing)
 
 ### 2.6 Renderer Data への登録と確認
 
-1. `Assets/Settings/PC_Renderer.asset` を選択する
-2. `OutlineRendererFeature` が登録されていなければ、**Add Renderer Feature** から追加する
-3. **Shader** に `OutlineFullscreen08` を割り当てる
-4. **Render Pass Event** を `Before Rendering Post Processing` にする
-5. Game ビューで輪郭線が出ていることを確認する
-6. `Window > Analysis > Render Graph Viewer` を開き、`Outline08` と `Outline08 Copy` が表示されていることを確認する
+ここでは、Renderer Data（`PC_Renderer.asset`）に輪郭線の Feature を登録し、Shader 欄へシェーダーを割り当てます。
+
+**手順 1：Renderer Data を開く**
+
+1. 画面下の **Project** ウィンドウで、左のフォルダツリーの `Assets > Settings` を開く
+2. `PC_Renderer` をクリックする
+
+Inspector（右側）に Renderer の設定が表示されます。Renderer Feature の一覧は、Inspector の下のほうにあります。
+
+**手順 2：Outline Renderer Feature を追加する**
+
+1. Inspector の下部にある **Add Renderer Feature** ボタンを押す
+2. 表示されたメニューから **OutlineRendererFeature** を選ぶ
+3. 一覧に `Outline Renderer Feature` の項目が追加されたことを確認する
+
+> すでに一覧に表示されている場合は、この手順は不要です。
+
+**手順 3：Shader に OutlineFullscreen08 を割り当てる**
+
+1. 追加された `Outline Renderer Feature` の項目を開く（項目名の左の三角をクリック）
+2. **Shader** 欄の右側にある小さな丸い選択ボタン（◎）をクリックする
+3. 一覧から `OutlineFullscreen08`（`ShaderProgramming/Chapter8/OutlineFullscreen08`）を選ぶ
+
+一覧に出てこない場合は、Project ウィンドウで `Assets/ShaderProgramming/Chapter08/OutlineFullscreen08.shader` を探し、Shader 欄へドラッグ＆ドロップします。Shader 欄が **None** のままだと、輪郭線は描画されません。
+
+**手順 4：Render Pass Event を確認する**
+
+同じ項目内の **Render Pass Event** を `Before Rendering Post Processing` に変更します。既定値を変えても、保存済みの値は自動では変わらないため、必ず手動で確認してください。
+
+**手順 5：動作を確認する**
+
+1. Game ビューを再生し、物体の縁に黒い線が出ていることを確認する
+2. `Window > Analysis > Render Graph Viewer` を開き、`Outline08` と `Outline08 Copy` が表示されていることを確認する
 
 ### 2.7 移行チェックリスト
 
@@ -264,7 +290,7 @@ protected override void Dispose(bool disposing)
 | Console の警告 | `RecordRenderGraph method` の警告が出ていない |
 | Render Graph Viewer | `Outline08`、`Outline08 Copy` が表示される |
 | 黒い画面になる | `_OutlineTemp` の書き込み先が `source` と同じになっていないか確認する |
-| 線が出ない | Depth Texture が有効か（Pipeline Asset の設定）、Renderer Feature が登録されているか確認する |
+| 線が出ない | Shader 欄が None でないか、Render Pass Event、Pipeline Asset の Depth Texture を確認する |
 | 警告が出る | `URP_COMPATIBILITY_MODE` が残っていないか（0.1 参照） |
 
 ---
@@ -367,7 +393,7 @@ UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
 
 ### 4.1 Render Graph Viewer
 
-`Window > Analysis > Render Graph Viewer` で開きます。Frame Debugger を開いた状態で Game ビューを再生すると、そのフレームの Render Graph が表示されます。
+`Window > Analysis > Render Graph Viewer` で開きます。Game ビューを再生した状態で開くと、そのフレームの Render Graph が表示されます。
 
 **確認する項目**
 
@@ -485,7 +511,7 @@ Shader Graph は、ノードを線で接続してシェーダーを作るツー�
 | 比較項目 | ShaderLab + HLSL（Chapter 01〜08） | Shader Graph（Chapter 09） |
 | :--- | :--- | :--- |
 | 書き方 | テキストで書く | ノードを接続する |
-| 出力 | 自分で書いたシェーダー | 生成されたシェーダー（`Open Generated Shader` で確認できる） |
+| 出力 | 自分で書いたシェーダー | 生成されたシェーダー（View Generated Shader で確認できる） |
 | 細かな制御 | 完全に制御できる | ノードで表現できる範囲に限られる |
 | 学習の目的 | 仕組みの理解 | 見た目の試行錯誤、ノード化された計算の理解 |
 
@@ -495,39 +521,50 @@ Shader Graph は、ノードを線で接続してシェーダーを作るツー�
 
 **作成手順**
 
-1. `Assets/ShaderProgramming/Chapter09/` を右クリックし、`Create > Shader Graph > URP > Unlit Shader Graph` を選ぶ
-2. 名前を `Lambert09` にする
-3. ダブルクリックしてグラフを開く
+1. Project ウィンドウで `Assets/ShaderProgramming/Chapter09/` を開く（フォルダがなければ右クリックして `Create > Folder` で作る）
+2. フォルダの余白を右クリックし、`Create > Shader Graph > URP > Unlit Shader Graph` を選ぶ
+3. 名前の入力欄が出たら `Lambert09` と入力して Enter を押す
+4. `Lambert09` をダブルクリックして開く
 
 **画面の構成**
 
 | 領域 | 内容 |
 | :--- | :--- |
 | Graph エリア（中央） | ノードを配置して線で接続する |
-| Blackboard（左） | Properties（プロパティ）を追加・管理する |
-| Graph Inspector（右） | ノードの設定、Precision、Surface などの設定 |
-| Master Stack（右端） | 最終出力（Unlit なら Color、Lit なら Base Color など） |
-| Main Preview | 結果のプレビュー |
+| Blackboard（左上） | Properties（プロパティ）を追加・管理する |
+| Graph Inspector（右上） | 選んだ項目の設定（Node Settings / Graph Settings） |
+| Master Stack（右端） | 最終出力。Unlit では Fragment の Base Color など |
+| Main Preview（右下） | 結果のプレビュー |
 
 ### 6.3 ノードの基本
 
 | 種類 | 代表例 | 役割（HLSL との対応） |
 | :--- | :--- | :--- |
-| 入力 | Position、Normal Vector、Main Light Direction | `IN.positionWS`、`IN.normalWS`、`GetMainLight().direction` |
-| 数学 | Add、Multiply、Dot Product、Saturate | `+`、`*`、`dot()`、`saturate()` |
+| 入力 | Normal Vector、Main Light Direction、Position | `IN.normalWS`、`GetMainLight().direction`、`IN.positionWS` |
+| 数学 | Dot Product、Saturate、Multiply、Add | `dot()`、`saturate()`、`*`、`+` |
 | 変換 | Transform、Normalize | 座標空間の変換、`normalize()` |
 | テクスチャ | Sample Texture 2D | `SAMPLE_TEXTURE2D()` |
 | プロパティ | Color、Float、Texture2D | `Properties` ブロックと CBUFFER の変数 |
 
+**ノードの操作の基本**
+
+- ノードの追加：Graph エリアを右クリック、またはスペースキーを押し、検索欄に名前を入力して候補をクリックする
+- 接続：出力ポート（右側の丸）から、入力ポート（左側の丸）までドラッグしてマウスを離す
+- 接続の解除：線の端をクリックして選択し、Delete キーを押す
+
 ### 6.4 プロパティ（Exposed）
 
-Blackboard で `+` を押してプロパティを追加します。**Exposed** にチェックを入れると、マテリアルの Inspector に表示されます。
+Blackboard の `+` ボタンから **Color** などを選んで、プロパティを追加します。名前を変更するには、Blackboard の項目名をダブルクリックして入力します。
+
+マテリアルの Inspector に表示するかどうかは、**Graph Inspector の Node Settings** で設定します。
 
 | 設定 | 意味 | HLSL との対応 |
 | :--- | :--- | :--- |
 | Reference | シェーダー内で使う名前（`_BaseColor`） | ShaderLab の `Properties` の名前 |
-| Exposed | Inspector に表示するか | 表示しない場合でも値は保持される |
-| Default | 初期値 | `= (1,1,1,1)` などの既定値 |
+| Show In Inspector（Exposed） | マテリアルの Inspector に表示するか | 表示しなくても値は保持される |
+| Default Value | 初期値（色の見本をクリックして変更する） | `Properties` の `= (1,1,1,1)` などの既定値 |
+
+> Unity 6 では Exposed の表示名が **Show In Inspector** に変わっています。意味は同じです。
 
 ### 6.5 Vertex と Fragment、Master Stack
 
@@ -536,12 +573,12 @@ Shader Graph は、頂点処理（Vertex）とピクセル処理（Fragment）�
 | Master Stack の項目 | 対応する HLSL の処理 |
 | :--- | :--- |
 | Vertex（Position、Normal） | `vert` 関数で出力する位置・法線 |
-| Fragment（Color、Alpha、Clip Threshold） | `frag` 関数の戻り値、`clip` |
+| Fragment（Base Color、Alpha、Clip Threshold） | `frag` 関数の戻り値、`clip` |
 
 ### 6.6 SubGraph と Custom Function
 
 - **SubGraph**：ノードをまとめて再利用する部品です。複数のグラフで同じ計算を使うときに作ります。
-- **Custom Function**：HLSL の関数をノードとして呼び出します。Shader Graph で表現しにくい処理（分岐や独自の計算）に使います。
+- **Custom Function**：HLSL の関数をノードとして呼び出します。Shader Graph で表現しにくい処理に使います。
 
 ```hlsl
 // Custom Function（File モード）の例：Lambert.hlsl
@@ -587,33 +624,140 @@ flowchart LR
 
 表面の向きとライトの向きの内積（`N·L`）で明るさを決める、Lambert 拡散反射を Shader Graph で作ります。第 2 章で HLSL で書いた `saturate(dot(N, L))` と同じ計算です。
 
-### 8.2 ノード構成
+### 8.2 完成時のノード構成
 
 ```mermaid
 flowchart LR
-    N["Normal Vector<br/>Space: World"] --> D["Dot Product"]
-    L["Main Light Direction"] --> D
+    N["Normal Vector<br/>Space: World"] --> D["Dot Product<br/>A"]
+    L["Main Light Direction"] --> D2["Dot Product<br/>B"]
     D --> S["Saturate"]
-    C["Color プロパティ<br/>_BaseColor"] --> M["Multiply"]
-    S --> M
-    M --> A["Add<br/>Ambient（0.2）"]
-    A --> O["Unlit Master<br/>Color"]
+    S --> M["Multiply<br/>B"]
+    C["_BaseColor<br/>Color プロパティ"] --> M2["Multiply<br/>A"]
+    M2 --> O["Fragment<br/>Base Color"]
+    M --> O
 ```
+
+> 説明を簡単にするため、図では Multiply を 2 つに分けて描いています。実際の手順では、Dot Product と Main Light Direction の接続が `B` 入力、`_BaseColor` と Saturate の結果を掛けるノードの `A` / `B` 入力、という配置です。
 
 ### 8.3 手順
 
-1. `Lambert09` を開く（Unlit Shader Graph）
-2. Blackboard で Color プロパティ `_BaseColor` を追加し、Exposed にする
-3. **Normal Vector** ノードを追加し、Space を `World` にする
-4. **Main Light Direction** ノードを追加する（Create Node 検索で `Main Light Direction` と入力する。見つからない場合は Custom Function で `GetMainLight().direction` を返す）
-5. **Dot Product** ノードを追加し、Normal Vector と Main Light Direction を接続する
-6. **Saturate** ノードを追加し、Dot Product の出力を接続する（負の値を 0 に丸める）
-7. **Multiply** ノードを追加し、`_BaseColor` と Saturate の出力を接続する
-8. **Add** ノードを追加し、Multiply の出力と、Color `(0.2, 0.2, 0.2)` を接続する（環境光の代わり）
-9. Add の出力を Master Stack の **Color** に接続する
-10. Main Preview で、ライトの向きを変えて明暗が変わることを確認する
+#### 手順 1：Lambert09 を開く
 
-### 8.4 生成コードとの対応
+上の 6.2 の手順で作成済みのものを開きます。
+
+#### 手順 2：_BaseColor プロパティを追加し、Show In Inspector にする
+
+**2-1. プロパティを追加する**
+
+1. Blackboard 上部の **`+`（Add）** ボタンをクリックする
+2. メニューから **Color** を選ぶ
+
+**2-2. 名前を _BaseColor にする**
+
+1. Blackboard の `Color` という項目名をダブルクリックする
+2. `_BaseColor` と入力し、Enter を押す
+
+> 先頭の `_` は、HLSL の変数名として `Properties` と対応させるためです。
+
+**2-3. Show In Inspector にする**
+
+1. Blackboard の `_BaseColor` をクリックして選択する
+2. 右側の **Graph Inspector** の **Node Settings** に `Property: _BaseColor` が表示される
+3. **Show In Inspector** の右側にある空の四角（チェックボックス）をクリックしてチェックを入れる
+
+**2-4. Default Value を白にする**
+
+初期値が黒のままだと、最後の計算結果がすべて黒になります。必ず白にしてください。
+
+1. Graph Inspector の **Default Value** の右側にある色の見本（黒いバー）をクリックする
+2. カラーピッカーが開くので、**HEX** の欄に `FFFFFFFF` と入力する（または A を 255、V を 100 にする）
+3. カラーピッカーを閉じる
+
+#### 手順 3：Normal Vector ノードを追加し、Space を World にする
+
+**3-1. ノードを追加する**
+
+1. Graph エリアの空いている場所で右クリックする
+2. メニュー上部の検索欄をクリックし、`Normal Vector` と入力する
+3. 候補の **Normal Vector** をクリックする
+
+> 別の方法：Graph エリアの空いている場所をクリックしてからスペースキーを押すと、検索ウィンドウが開きます。
+
+**3-2. Space を World にする**
+
+1. Normal Vector ノードの中の **Space** の欄（初期値は `Object`）をクリックする
+2. 一覧から **World** を選ぶ
+
+欄の表示が `World` になれば完了です。
+
+#### 手順 4：Main Light Direction ノードを追加する
+
+1. Graph エリアの空いている場所で右クリックする
+2. 検索欄に `Main Light Direction` と入力し、候補をクリックする
+
+ノードの右側に **Direction(3)** の出力ポート（丸）が表示されます。
+
+> 候補に出ない場合は、6.6 の Custom Function で代用します（後述の補足を参照）。
+
+#### 手順 5：Dot Product ノードを追加し、2 つの入力を接続する
+
+1. 右クリックして検索欄に `Dot Product` と入力し、クリックして配置する
+2. **Normal Vector** の右側の出力ポート（`Out(3)`）から、**Dot Product** の **A(3)** の入力ポートまでドラッグして離す
+3. **Main Light Direction** の **Direction(3)** の出力ポートから、**Dot Product** の **B(3)** の入力ポートまでドラッグして離す
+
+A と B の両方に線がつながれば完了です。
+
+#### 手順 6：Saturate ノードを追加する
+
+1. Dot Product の右側の空いている場所で右クリックし、`Saturate` と入力してクリックする
+2. Dot Product の出力ポート **Out(1)**（右端の丸）から、Saturate の入力ポート **In(1)** までドラッグして離す
+
+> Saturate は、負の値を 0 に丸めます。ライトの裏側の面が負の明るさになるのを防ぎます。
+
+#### 手順 7：Multiply ノードを追加し、_BaseColor と Saturate を接続する
+
+1. 右クリックして検索欄に `Multiply` と入力し、クリックして配置する
+2. Blackboard の `_BaseColor` の項目を、Graph エリアの空いている場所へドラッグする。色のノード（`_BaseColor(4)`）が置かれる
+3. `_BaseColor(4)` の右側の出力ポートから、**Multiply** の **A(4)** の入力ポートまでドラッグして離す
+4. **Saturate** の出力ポート **Out(1)** から、**Multiply** の **B(4)** の入力ポートまでドラッグして離す
+
+> Blackboard からドラッグすると、プロパティのノードが自動で作られます。
+
+#### 手順 8：Multiply の結果を Fragment の Base Color に接続する
+
+1. **Multiply** の右側の出力ポート **Out(4)** から、**Fragment** の **Base Color(3)** の入力ポートまでドラッグして離す
+
+これで「法線とライトの向きの内積 → 0〜1 に丸める → 色と掛ける → 最終色」が完成します。
+
+#### 手順 9：プレビューと生成コードを確認する
+
+1. Main Preview（右下）を確認する。ライトの方向に対応した明暗のある球になっていれば成功
+2. 画面上部の **View Generated Shader**（または Graph Inspector の Generated Code）を開く
+3. `saturate(dot(...))` を含む行を探す。ノードの接続が、そのまま式になっていることが分かる
+
+### 8.4 補足：Main Light Direction が見つからない場合
+
+Create Node の検索で `Main Light Direction` が出ない場合は、Custom Function で同じ値を作ります。
+
+1. Graph エリアで右クリックし、`Custom Function` を追加する
+2. Graph Inspector の **Type** を **String** にし、次のコードを貼り付ける
+
+```hlsl
+void MainLightDir_float(out float3 Direction)
+{
+#ifdef SHADERGRAPH_PREVIEW
+    Direction = float3(0, 1, 0);
+#else
+    Direction = GetMainLight().direction;
+#endif
+}
+```
+
+3. 出力 **Direction(3)** を、Dot Product の **B(3)** に接続する
+
+> `SHADERGRAPH_PREVIEW` の分岐は、プレビュー画面でエラーにならないための処理です。
+
+### 8.5 生成コードとの対応
 
 | ノード | HLSL の対応 |
 | :--- | :--- |
@@ -622,15 +766,19 @@ flowchart LR
 | Dot Product | `dot(N, L)` |
 | Saturate | `saturate(...)` |
 | Multiply | `_BaseColor.rgb * NdotL` |
-| Add | `+ ambient` |
 
-**確認方法**：グラフの上部の **View Generated Shader**（または Graph Inspector の Generated Code）を開き、`saturate(dot(...))` の行を探してください。ノードの接続が、そのまま式になっていることが分かります。
+### 8.6 確認ポイント
 
-### 8.5 確認ポイント
+| 症状・確認内容 | 原因と対処 |
+| :--- | :--- |
+| プレビューが黒い | `_BaseColor` の Default Value が黒。白に変更する（手順 2-4） |
+| 明暗が変わらない | Multiply の A と B の接続を確認する。B が Saturate につながっているか |
+| Dot Product のプレビューが単色 | Normal Vector の Space が Object のまま。World にする |
+| 線がつながらない | 出力ポート（右側の丸）から入力ポート（左側の丸）へ向けてドラッグしているか確認する |
 
 - ライトを真上から当てると、上を向いた面が明るくなる
-- ライトの裏側に回ると、その面は環境光の分だけになる（負の値が 0 に丸められている）
-- `_BaseColor` を変えると、明るい部分の色だけが変わる
+- ライトの裏側に回ると、その面は暗くなる（負の値が 0 に丸められている）
+- `_BaseColor` を変えると、明るい部分の色が変わる
 
 ---
 
@@ -892,21 +1040,41 @@ public class WipeController : MonoBehaviour
 
 **使い方**
 
-- 空の GameObject（例：`WipeManager`）を作成し、このスクリプトを追加する
-- Play を押し、Space を押すと覆われ、もう一度押すと戻る
-- 進行度は Feature が参照するため、Inspector の値は変わりません
+1. Hierarchy で右クリックし、`Create Empty` で空の GameObject を作る。名前を `WipeManager` にする
+2. `WipeManager` を選び、Inspector の **Add Component** に `WipeController` と入力して追加する
+3. Play を押し、Space を押すと覆われ、もう一度押すと戻る
 
 > `Keyboard.current` は Input System パッケージを使います。本プロジェクトは Input System の設定ファイル（`InputSystem_Actions.inputactions`）を持つため、そのまま使えます。
 
 ### 9.5 Renderer Data への登録と確認
 
-1. `Assets/Settings/PC_Renderer.asset` を選択する
-2. **Add Renderer Feature** から **WipeRendererFeature** を追加する
-3. **Shader** に `WipeFullscreen09` を割り当てる
-4. **Mode** を `Iris` にする
-5. Wipe Color を黒、Edge Color をオレンジに設定する
-6. Play し、Space キーでワイプが覆う・戻ることを確認する
-7. Render Graph Viewer で `Wipe09` と `Wipe09 Copy` が、`Outline08` の後に表示されていることを確認する
+**手順 1：Renderer Data を開く**
+
+`Assets/Settings/PC_Renderer.asset` を Project ウィンドウでクリックします。
+
+**手順 2：WipeRendererFeature を追加する**
+
+1. Inspector の下部にある **Add Renderer Feature** を押す
+2. メニューから **WipeRendererFeature** を選ぶ
+
+**手順 3：設定を入力する**
+
+追加された `Wipe Renderer Feature` の項目を開き、次のように設定します。
+
+| 項目 | 設定値 |
+| :--- | :--- |
+| Render Pass Event | `After Rendering Post Processing`（既定のまま） |
+| Shader | `WipeFullscreen09`（◎ボタンから選ぶ。または Project から Shader 欄へドラッグ＆ドロップ） |
+| Mode | `Iris` |
+| Wipe Color | 黒（既定のまま） |
+| Edge Color | オレンジ（既定のまま） |
+
+**手順 4：動作を確認する**
+
+1. Play し、Space キーを押す
+2. 画面が中心から円状に覆われ、覆われる境界にオレンジの縁が見えることを確認する
+3. Mode を `Horizontal` に変えると、左から右へ覆われることを確認する（変更は再生を止めてから行ってください）
+4. Render Graph Viewer で `Wipe09` と `Wipe09 Copy` が、`Outline08` の後に表示されていることを確認する
 
 **確認ポイント**
 
@@ -941,9 +1109,9 @@ public class WipeController : MonoBehaviour
 4. **RenderGraphBlitUtil.cs の作成**：2.4 の内容で `Chapter09/` に作成する（0.4）
 5. **Chapter09/OutlinePass.cs の作成**：2.3 の内容で作成する
 6. **OutlineRendererFeature.cs の修正**：`Dispose` から `_pass?.Dispose();` を削除する（2.5）
-7. **輪郭線の確認**：`PC_Renderer.asset` で輪郭線が出ることを確認し、Render Graph Viewer で `Outline08` と `Outline08 Copy` の読み書きを確認する
-8. **Lambert09 の作成**：Shader Graph で作成し、View Generated Shader で `saturate(dot(...))` の行を確認する
-9. **ワイプの実装**：`WipeFullscreen09.shader`、`WipeRendererFeature.cs`、`WipeController.cs` を作成し、`PC_Renderer.asset` に登録する
+7. **輪郭線の確認**：2.6 の手順で Renderer Data に登録し、輪郭線と Render Graph Viewer の表示を確認する
+8. **Lambert09 の作成**：8.3 の手順で作成し、プレビューと生成コードを確認する
+9. **ワイプの実装**：`WipeFullscreen09.shader`、`WipeRendererFeature.cs`、`WipeController.cs` を作成し、9.5 の手順で登録する
 10. **動作確認**：Space キーでワイプを動かし、Iris と Horizontal の違い、Render Graph Viewer での `Wipe09` の順序（`Outline08` の後）を確認する
 11. **発展課題**：`Wipe Color` に画像を使えるように、Texture2D のプロパティを追加し、覆った部分に画像を表示させる
 
@@ -957,14 +1125,15 @@ public class WipeController : MonoBehaviour
 | CS0103：'RenderGraphBlitUtil' という名前は存在しません | `RenderGraphBlitUtil.cs` が無い、またはファイル名とクラス名が一致していない（0.4） |
 | `RecordRenderGraph` の警告が出る | Execute 方式のパスが残っている。`EmptyRendererFeature` を登録から外す（0.2）。`URP_COMPATIBILITY_MODE` が残っている場合も同じ警告が出る（0.1） |
 | パスが実行されない | `URP_COMPATIBILITY_MODE` が有効のまま。Render Graph 版のパスは、このシンボルがあると呼ばれない（0.1） |
-| Missing（Renderer Feature が見つからない） | 削除したスクリプトが Renderer Data に残っている。Renderer Data の Feature 一覧から Remove する |
+| Feature の項目が赤く Missing と出る | 削除したスクリプトが Renderer Data に残っている。一覧から Remove する |
 | 輪郭線やワイプが黒くなる | 読み取りの宣言（`UseTexture`）が不足している、または `source` と `temp` の順序が逆 |
-| 深度を使うと線が出ない | Depth Texture が無効、または `_CameraDepthTexture` の登録方法がバージョンに合っていない（2.3 の注意を参照） |
-| ワイプが覆わない | `Progress` が 0 のまま。`WipeController` が動いているか、Console のエラーを確認する |
+| 深度を使うと線が出ない | Depth Texture が無効、Shader 欄が None、または `_CameraDepthTexture` の登録方法がバージョンに合っていない（2.3 の注意を参照） |
+| ワイプが覆わない | `Progress` が 0 のまま。`WipeController` が `WipeManager` に付いているか、Console のエラーを確認する |
 | 縁が画面全体に出る | `_EdgeWidth` が大きすぎる、または `active` が効いていない（Progress の値を確認） |
 | Iris が楕円に見える | `_ScreenParams` の縦横比補正が効いていない。Game ビューの解像度を確認する |
 | Space キーに反応しない | Input System が有効か（Project Settings の Active Input Handling）、Game ビューにフォーカスがあるか確認する |
-| Shader Graph のノードが見つからない | URP のバージョンによりノード名が異なる。Custom Function で代用する |
+| Lambert09 のプレビューが黒い | `_BaseColor` の Default Value が黒（8.3 の手順 2-4 で白にする） |
+| Shader Graph のノードが見つからない | URP のバージョンによりノード名が異なる。Custom Function で代用する（8.4） |
 
 ---
 
@@ -975,7 +1144,7 @@ public class WipeController : MonoBehaviour
 - Render パイプラインは、Pipeline Asset → Renderer Data → Feature → Pass → Render Graph という階層で組み立てられ、Render Graph は Record・Compile・Execute の 3 段階で実行される
 - Render Graph Viewer では、パスの順序と、リソースの読み書き・寿命を読み取れる
 - `TextureHandle` と読み書きの宣言によって、依存関係と一時テクスチャの寿命が自動的に管理される
-- Shader Graph は、ノードの接続で HLSL の計算を表すツールであり、生成されたコードを確認することで、HLSL で学んだ内容と結びつけられる
+- Shader Graph は、ノードの接続で HLSL の計算を表すツールであり、生成されたコードを確認することで、HLSL で学んだ内容と結びつけられる。`_BaseColor` の Default Value を白にしないと結果が黒くなる点に注意する
 - ワイプは、進行度から境界を作り、滑らかな遷移と縁の線を重ねる演出であり、Render Graph のフルスクリーンパスとして実装できる
 
 次の第 10 章では、Volume と Post Processing を扱い、本章で作った Render Graph のパスを、ブルームのような複数段階の画像処理へ応用します。

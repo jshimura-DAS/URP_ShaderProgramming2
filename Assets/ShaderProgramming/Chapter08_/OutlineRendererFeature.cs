@@ -50,6 +50,6 @@ public class OutlineRendererFeature : ScriptableRendererFeature
     protected override void Dispose(bool disposing)
     {
         CoreUtils.Destroy(_material);
-        _pass?.Dispose();
+        // _pass?.Dispose();
     }
 }
