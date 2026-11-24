@@ -6,6 +6,64 @@
 
 ---
 
+## 0. 移行前の確認と最終的なファイル構成
+
+Chapter 08 の 0 章で `URP_COMPATIBILITY_MODE` を設定している場合は、この章を始める前に次の作業を行ってください。
+
+### 0.1 作業の前提
+
+| 確認項目 | 対処 |
+| :--- | :--- |
+| `URP_COMPATIBILITY_MODE` が設定されている | Player 設定の Scripting Define Symbols から削除する。残っていると `RecordRenderGraph` が呼ばれず、この章のパスが動かない |
+| Graphics 設定で Compatibility Mode が有効 | 無効にし、Render Graph が有効な状態にする |
+| `EmptyRendererFeature` が `PC_Renderer` に登録されている | 0.2 の手順で登録を外してからファイルを削除する |
+| `Chapter08/OutlinePass.cs` が存在する | 削除する（0.3 参照） |
+
+### 0.2 EmptyRendererFeature の削除手順
+
+`EmptyRendererFeature.cs` を削除する前に、登録を外します。登録したままファイルを消すと、Renderer Data の Inspector に `Missing` の表示が残ります。
+
+1. `Assets/Settings/PC_Renderer.asset` を選択する
+2. Inspector の Renderer Feature 一覧で **Empty Renderer Feature** を選び、右上のメニュー（⋮）から **Remove** を選ぶ
+3. 同じ手順で `Mobile_Renderer.asset` からも外す（登録している場合のみ）
+4. `Assets/ShaderProgramming/Chapter08/EmptyRendererFeature.cs` と `EmptyRendererFeature.cs.meta` を削除する
+
+### 0.3 OutlinePass の重複を解消する
+
+Chapter 08 の `OutlinePass.cs`（Execute 版）と、Chapter 09 の `OutlinePass.cs`（Render Graph 版）は、同じ名前のクラス `OutlinePass` を定義しています。Unity では同名のクラスを 2 つ持てないため、次のどちらか 1 つだけを残します。
+
+| 残すファイル | 判断 |
+| :--- | :--- |
+| `Assets/ShaderProgramming/Chapter09/OutlinePass.cs` | **残す**。Render Graph 版であり、本章の最終形 |
+| `Assets/ShaderProgramming/Chapter08/OutlinePass.cs` | **削除する**。Execute 版で、Render Graph では動作しない |
+
+削除後にコンパイルエラー（CS0101：型 'OutlinePass' は既に定義されています）が消えていれば、この段階は完了です。
+
+### 0.4 RenderGraphBlitUtil.cs を作成する
+
+2.4 で説明する `RenderGraphBlitUtil` は、Chapter 09 の `OutlinePass.cs` から呼び出されます。このクラスを定義したファイルが無いと、次のエラーが出ます。
+
+> CS0103：現在のコンテキストに 'RenderGraphBlitUtil' という名前は存在しません
+
+ファイル名は `RenderGraphBlitUtil.cs`、クラス名は `RenderGraphBlitUtil` と一致させます。保存先は `Assets/ShaderProgramming/Chapter09/` を推奨します。Unity は保存先フォルダにかかわらずスクリプトを認識するため、既に別のフォルダに作成している場合はそのままでも動きます。
+
+### 0.5 最終的なファイル構成
+
+この章を終えた時点の Chapter 08・09 関連のファイルは次のとおりです。
+
+| ファイル | 場所 | 状態 |
+| :--- | :--- | :--- |
+| `OutlineFullscreen08.shader` | Chapter08 | 変更なし |
+| `OutlineRendererFeature.cs` | Chapter08 | `Dispose` を変更（2.5） |
+| `OutlinePass.cs` | Chapter09 | Render Graph 版（2.3） |
+| `RenderGraphBlitUtil.cs` | Chapter09 | 新規作成（2.4） |
+| `OutlinePass.cs`（Execute 版） | Chapter08 | 削除（0.3） |
+| `EmptyRendererFeature.cs` | Chapter08 | 削除（0.2） |
+| `Dither08.shader` / `Stealth08.shader` / `StealthController.cs` | Chapter08 | 変更なし |
+| `WipeFullscreen09.shader` / `WipeRendererFeature.cs` / `WipeController.cs` | Chapter09 | 新規作成（9 章） |
+
+---
+
 ## 1. 学習目標
 
 - Chapter 08 の輪郭線を、`Execute` 方式から `RecordRenderGraph` 方式へ移行できる
@@ -24,10 +82,11 @@
 
 | 項目 | 移行の要否 | 理由 |
 | :--- | :--- | :--- |
-| `OutlinePass.cs` | 移行する | `Execute` を使うため、Render Graph では動かない |
+| `OutlinePass.cs`（Chapter08） | 削除する | Execute 版。Chapter09 の Render Graph 版と同名のクラスのため、残すとコンパイルエラーになる |
+| `OutlinePass.cs`（Chapter09） | 新規に用意する（本章で作成） | Render Graph 版の本体 |
 | `OutlineRendererFeature.cs` | 一部変更する | `Dispose` でパスの `RTHandle` を解放していたため、その処理を削除する |
 | `OutlineFullscreen08.shader` | 変更しない | `Blit.hlsl` の `_BlitTexture` を使うため、Render Graph でも同じ書き方で動く |
-| `EmptyRendererFeature.cs` | 削除する | 教材の骨組みとしての役割を終えたため。残す場合は `RecordRenderGraph` 版の空パスに書き換える |
+| `EmptyRendererFeature.cs` | 削除する | 教材の骨組みとしての役割を終えたため（0.2 参照） |
 | `Stealth08.shader` / `StealthController.cs` | 変更しない | マテリアルと `MaterialPropertyBlock` だけで動作するため |
 | `Dither08.shader` | 変更しない | 同上 |
 
@@ -46,7 +105,7 @@ Chapter 08 の `Execute` では、描画命令を実行時に `CommandBuffer` �
 
 ### 2.3 OutlinePass（Render Graph 版）
 
-`Assets/ShaderProgramming/Chapter08/OutlinePass.cs` を次の内容に置き換えます。
+`Assets/ShaderProgramming/Chapter09/OutlinePass.cs` を次の内容で作成します（Chapter 08 の同名ファイルは削除済みであること）。
 
 ```csharp
 using UnityEngine;
@@ -132,7 +191,7 @@ public class OutlinePass : ScriptableRenderPass
 
 ### 2.4 共通のコピーパス（RenderGraphBlitUtil.cs）
 
-2 つの Blit パスを 1 か所にまとめるため、`Assets/ShaderProgramming/Chapter08/RenderGraphBlitUtil.cs` を作成します。
+2 つの Blit パスを 1 か所にまとめるため、`Assets/ShaderProgramming/Chapter09/RenderGraphBlitUtil.cs` を作成します。
 
 ```csharp
 using UnityEngine;
@@ -171,12 +230,13 @@ public static class RenderGraphBlitUtil
 }
 ```
 
+> このクラスは `OutlinePass` と `WipePass` の両方から使います。`static` クラスのため、どの名前空間からも `RenderGraphBlitUtil.AddCopyPass(...)` で呼び出せます。
+
 ### 2.5 OutlineRendererFeature の変更点
 
-`OutlineRendererFeature.cs` は、次の 2 点だけ変更します。
+`Assets/ShaderProgramming/Chapter08/OutlineRendererFeature.cs` は、次の 1 点だけ変更します。
 
-1. `Create` の中の `_pass = new OutlinePass { ... }` は変更しません。
-2. `Dispose` の中の `_pass?.Dispose();` を削除します（Render Graph 版では一時テクスチャを手動で解放しないため）。
+1. `Dispose` の中の `_pass?.Dispose();` を削除する（Render Graph 版では一時テクスチャを手動で解放しないため）
 
 ```csharp
 protected override void Dispose(bool disposing)
@@ -185,12 +245,12 @@ protected override void Dispose(bool disposing)
 }
 ```
 
-`AddRenderPasses` の処理（Game カメラのみ、`EnqueuePass`）は、そのまま動作します。
+`Create` の `_pass = new OutlinePass { ... }` と `AddRenderPasses` の処理（Game カメラのみ、`EnqueuePass`）は、そのまま動作します。`OutlinePass` は Chapter09 フォルダにありますが、同じアセンブリ内の型のため、フォルダをまたいでも参照できます。
 
 ### 2.6 Renderer Data への登録と確認
 
 1. `Assets/Settings/PC_Renderer.asset` を選択する
-2. **Add Renderer Feature** から **OutlineRendererFeature** を追加する
+2. `OutlineRendererFeature` が登録されていなければ、**Add Renderer Feature** から追加する
 3. **Shader** に `OutlineFullscreen08` を割り当てる
 4. **Render Pass Event** を `Before Rendering Post Processing` にする
 5. Game ビューで輪郭線が出ていることを確認する
@@ -200,11 +260,12 @@ protected override void Dispose(bool disposing)
 
 | 確認項目 | 期待する状態 |
 | :--- | :--- |
+| Console のエラー | CS0101（型の重複）と CS0103（RenderGraphBlitUtil が存在しない）が出ていない |
 | Console の警告 | `RecordRenderGraph method` の警告が出ていない |
 | Render Graph Viewer | `Outline08`、`Outline08 Copy` が表示される |
 | 黒い画面になる | `_OutlineTemp` の書き込み先が `source` と同じになっていないか確認する |
 | 線が出ない | Depth Texture が有効か（Pipeline Asset の設定）、Renderer Feature が登録されているか確認する |
-| エラーが出る | 2.3 の API 名を URP のサンプルと照合する |
+| 警告が出る | `URP_COMPATIBILITY_MODE` が残っていないか（0.1 参照） |
 
 ---
 
@@ -874,15 +935,17 @@ public class WipeController : MonoBehaviour
 
 ## 10. 実習手順
 
-1. Chapter 08 の `OutlinePass.cs` を Render Graph 版に置き換え、`RenderGraphBlitUtil.cs` を追加する
-2. `OutlineRendererFeature.cs` の `Dispose` を修正し、`PC_Renderer.asset` で輪郭線が出ることを確認する
-3. Render Graph Viewer で、`Outline08` と `Outline08 Copy` の読み書きを確認し、スクリーンショットに描き写す
-4. `Lambert09` の Shader Graph を作成し、`_BaseColor` とライトの向きで明暗が変わることを確認する
-5. View Generated Shader で、`saturate(dot(...))` の行を探し、ノードとの対応を確認する
-6. `WipeFullscreen09.shader`、`WipeRendererFeature.cs`、`WipeController.cs` を作成し、`PC_Renderer.asset` に登録する
-7. Space キーでワイプを動かし、Iris と Horizontal の違いを観察する
-8. Render Graph Viewer で、`Wipe09` が `Outline08` の後に実行されていることを確認する
-9. 発展課題：`Wipe Color` に画像を使えるように、Texture2D のプロパティを追加し、覆った部分に画像を表示させる
+1. **事前準備**：0.1 の確認（`URP_COMPATIBILITY_MODE` の削除、Render Graph の有効化）を行う
+2. **EmptyRendererFeature の登録解除と削除**：0.2 の手順で行う
+3. **OutlinePass の重複解消**：`Chapter08/OutlinePass.cs` を削除する（0.3）
+4. **RenderGraphBlitUtil.cs の作成**：2.4 の内容で `Chapter09/` に作成する（0.4）
+5. **Chapter09/OutlinePass.cs の作成**：2.3 の内容で作成する
+6. **OutlineRendererFeature.cs の修正**：`Dispose` から `_pass?.Dispose();` を削除する（2.5）
+7. **輪郭線の確認**：`PC_Renderer.asset` で輪郭線が出ることを確認し、Render Graph Viewer で `Outline08` と `Outline08 Copy` の読み書きを確認する
+8. **Lambert09 の作成**：Shader Graph で作成し、View Generated Shader で `saturate(dot(...))` の行を確認する
+9. **ワイプの実装**：`WipeFullscreen09.shader`、`WipeRendererFeature.cs`、`WipeController.cs` を作成し、`PC_Renderer.asset` に登録する
+10. **動作確認**：Space キーでワイプを動かし、Iris と Horizontal の違い、Render Graph Viewer での `Wipe09` の順序（`Outline08` の後）を確認する
+11. **発展課題**：`Wipe Color` に画像を使えるように、Texture2D のプロパティを追加し、覆った部分に画像を表示させる
 
 ---
 
@@ -890,7 +953,11 @@ public class WipeController : MonoBehaviour
 
 | 症状 | 原因と対処 |
 | :--- | :--- |
-| `RecordRenderGraph` の警告が出る | Execute 方式のパスが残っている。`EmptyRendererFeature` を登録から外す |
+| CS0101：型 'OutlinePass' は既に定義されています | `Chapter08/OutlinePass.cs` と `Chapter09/OutlinePass.cs` が両方ある。Chapter08 の方を削除する（0.3） |
+| CS0103：'RenderGraphBlitUtil' という名前は存在しません | `RenderGraphBlitUtil.cs` が無い、またはファイル名とクラス名が一致していない（0.4） |
+| `RecordRenderGraph` の警告が出る | Execute 方式のパスが残っている。`EmptyRendererFeature` を登録から外す（0.2）。`URP_COMPATIBILITY_MODE` が残っている場合も同じ警告が出る（0.1） |
+| パスが実行されない | `URP_COMPATIBILITY_MODE` が有効のまま。Render Graph 版のパスは、このシンボルがあると呼ばれない（0.1） |
+| Missing（Renderer Feature が見つからない） | 削除したスクリプトが Renderer Data に残っている。Renderer Data の Feature 一覧から Remove する |
 | 輪郭線やワイプが黒くなる | 読み取りの宣言（`UseTexture`）が不足している、または `source` と `temp` の順序が逆 |
 | 深度を使うと線が出ない | Depth Texture が無効、または `_CameraDepthTexture` の登録方法がバージョンに合っていない（2.3 の注意を参照） |
 | ワイプが覆わない | `Progress` が 0 のまま。`WipeController` が動いているか、Console のエラーを確認する |
@@ -903,6 +970,7 @@ public class WipeController : MonoBehaviour
 
 ## 12. まとめ
 
+- 移行の前に、`URP_COMPATIBILITY_MODE` の削除、`EmptyRendererFeature` の登録解除、`Chapter08/OutlinePass.cs` の削除を行う。同名クラスの重複と、Execute 方式の残存が、コンパイルエラーと描画不良の主な原因になる
 - 輪郭線は、`Execute` の命令を `RecordRenderGraph` の宣言と `SetRenderFunc` の実行に分けることで、Render Graph 版に移行できる
 - Render パイプラインは、Pipeline Asset → Renderer Data → Feature → Pass → Render Graph という階層で組み立てられ、Render Graph は Record・Compile・Execute の 3 段階で実行される
 - Render Graph Viewer では、パスの順序と、リソースの読み書き・寿命を読み取れる
