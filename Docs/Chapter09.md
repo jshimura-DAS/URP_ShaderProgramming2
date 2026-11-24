@@ -734,7 +734,7 @@ A と B の両方に線がつながれば完了です。
 #### 手順 9：プレビューと生成コードを確認する
 
 1. Main Preview（右下）を確認する。ライトの方向に対応した明暗のある球になっていれば成功
-2. 画面上部の **View Generated Shader**（または Graph Inspector の Generated Code）を開く
+2. ShaderのImportSettingsをクリックし、そのInspectorの **View Generated Shader** を開く
 3. `saturate(dot(...))` を含む行を探す。ノードの接続が、そのまま式になっていることが分かる
 
 ### 8.4 補足：Main Light Direction が見つからない場合
