@@ -263,6 +263,7 @@ Inspector（右側）に Renderer の設定が表示されます。Renderer Feat
 2. 表示されたメニューから **OutlineRendererFeature** を選ぶ
 3. 一覧に `Outline Renderer Feature` の項目が追加されたことを確認する
 
+
 > すでに一覧に表示されている場合は、この手順は不要です。
 
 **手順 3：Shader に OutlineFullscreen08 を割り当てる**
@@ -273,6 +274,8 @@ Inspector（右側）に Renderer の設定が表示されます。Renderer Feat
 
 一覧に出てこない場合は、Project ウィンドウで `Assets/ShaderProgramming/Chapter08/OutlineFullscreen08.shader` を探し、Shader 欄へドラッグ＆ドロップします。Shader 欄が **None** のままだと、輪郭線は描画されません。
 
+![](images/PC_Renderer_OutlineRendererFeature.png)
+
 **手順 4：Render Pass Event を確認する**
 
 同じ項目内の **Render Pass Event** を `Before Rendering Post Processing` に変更します。既定値を変えても、保存済みの値は自動では変わらないため、必ず手動で確認してください。
@@ -281,6 +284,7 @@ Inspector（右側）に Renderer の設定が表示されます。Renderer Feat
 
 1. Game ビューを再生し、物体の縁に黒い線が出ていることを確認する
 2. `Window > Analysis > Render Graph Viewer` を開き、`Outline08` と `Outline08 Copy` が表示されていることを確認する
+![](images/RenderGraphViewer_Outline08.png)
 
 ### 2.7 移行チェックリスト
 

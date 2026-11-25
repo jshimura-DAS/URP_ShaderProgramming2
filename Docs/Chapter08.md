@@ -8,6 +8,10 @@
 
 ## 0. 事前準備：Compatibility Mode（Execute 方式）を有効にする
 
+この章では、Unity 6.3 以降でデフォルトになった Render Graph ではなく、従来の Execute 方式で描画パスを組み立てる Compatibility Mode を使います。Compatibility Mode は Unity 6.4 で削除される予定のため、教材の作業環境としてのみ使ってください。このChapter08のコードは、Unity 6.3 以降では Compatibility Mode を有効にしないと動作しません。そのため、**設定を変えるとProject全体の他のSceneにも影響が出ます**。次の手順で Compatibility Mode を有効にしてください。
+
+**別のプロジェクトを新規作成して独立させることを推奨します**
+
 ### 0.1 Unity 6.3 の仕様
 
 Unity 6.3 では Render Graph が既定で有効です。`Execute` だけを実装したパスは実行されず、警告が表示されます。さらに、Unity 6.3 では Graphics 設定に **Compatibility Mode（Render Graph Disabled）** のチェックボックスが表示されません。
