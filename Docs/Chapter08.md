@@ -276,6 +276,116 @@ Render Graph は新しい方式ですが、同じ概念（パスの挿入位置�
 | `ScriptableRenderPass` | 1 回の描画段階。`Execute` で `CommandBuffer` に命令を書く |
 | `RenderPassEvent` | パスを挿入する位置（列挙型） |
 
+
+## 4.1 必要な 3 つのクラス：表の見方を分解する
+
+元の表は、性質の違うものを同じ列に並べているため分かりづらくなっています。実際には次の 3 種類に分けて考えると整理できます。
+
+| 種類 | 何か | 本章での例 |
+| :--- | :--- | :--- |
+| クラス（C# の型） | コードで定義する設計図 | `ScriptableRendererFeature`、`ScriptableRenderPass` |
+| 列挙型（enum） | 決められた候補から 1 つを選ぶ値の集まり | `RenderPassEvent` |
+| 設定値（フィールド） | クラスの中に置かれ、Inspector で編集できる値 | `renderPassEvent`、`shader`、`threshold` など |
+
+表の「`RenderPassEvent`」は、クラスでも設定値でもなく、**挿入位置の候補を並べた enum** です。ここが一番混同しやすい点です。
+
+### 1. ScriptableRendererFeature（クラス・継承元）
+
+- **種類**：クラス。URP が用意している基底クラス（親）です。
+- **役割**：Renderer Data（`PC_Renderer.asset`）に部品として登録されるための親です。
+- **派生クラス**：開発者は `ScriptableRendererFeature` を継承して、自分の Feature を作ります。
+
+```csharp
+public class EmptyRendererFeature : ScriptableRendererFeature   // 継承
+{
+    // …
+}
+```
+
+- **Inspector での見え方**：`PC_Renderer` の一覧に、派生クラスの名前（`Empty Renderer Feature` など）で表示されます。
+- **ポイント**：Feature は「パスを作って、キューに入れる係」です。描画そのものは持ちません。
+
+### 2. ScriptableRenderPass（クラス・継承元）
+
+- **種類**：クラス。URP の基底クラスです。
+- **役割**：1 回分の描画段階そのものです。`Execute` の中に、`CommandBuffer` への命令を書きます。
+- **派生クラスの置き場所**：Feature の**内側**に入れ子（ネスト）のクラスとして定義するのが、本章の書き方です。
+
+```csharp
+public class EmptyRendererFeature : ScriptableRendererFeature
+{
+    class EmptyPass : ScriptableRenderPass      // Feature の内側に定義された派生クラス
+    {
+        public override void Execute(...) { /* 描画命令 */ }
+    }
+
+    EmptyPass _pass;                            // Feature が Pass のインスタンスを保持する
+}
+```
+
+- **ポイント**：`EmptyPass` は独立したクラスですが、ファイルは `EmptyRendererFeature.cs` 1 つにまとまります。Feature が `Pass` を生成し、`AddRenderPasses` で `EnqueuePass` して実行させます。
+
+### 3. RenderPassEvent（列挙型・enum）
+
+- **種類**：enum（列挙型）。クラスではありません。
+- **役割**：Pass をどの位置に挿入するかを、候補の中から選ぶための値です。
+- **使われる場所**：Pass の `renderPassEvent` プロパティに代入します。
+
+```csharp
+_pass.renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
+```
+
+- **候補の例**：`BeforeRenderingOpaques`、`AfterRenderingPostProcessing` など（4.2 の表を参照）。
+- **ポイント**：enum なので、値は `RenderPassEvent.〇〇` という形で、決まった名前の中から選びます。新しい値を作ることはできません。
+
+### 3 つの関係を 1 枚にまとめると
+
+```mermaid
+flowchart TD
+    F["ScriptableRendererFeature<br/>（継承元クラス）"] -->|継承| FD["EmptyRendererFeature<br/>（派生クラス・Renderer Data に登録される）"]
+    FD -->|"内側に定義・生成"| P["ScriptableRenderPass<br/>（継承元クラス）"]
+    P -->|継承| PD["EmptyPass<br/>（派生クラス・描画命令を書く）"]
+    E["RenderPassEvent<br/>（enum・挿入位置の候補）"] -.->|"値を代入"| PD
+```
+
+- 実線：継承、または生成・内包の関係（クラス同士）
+- 点線：値の受け渡し（enum の値を Pass の設定に代入する関係）
+
+### 設定値（フィールド）と混同しないための見分け方
+
+「Inspector に表示される項目」は、ほとんどが**クラスのフィールド**です。
+
+| 項目名（Inspector） | 正体 | 置かれている場所 |
+| :--- | :--- | :--- |
+| Render Pass Event | `RenderPassEvent` 型のフィールド | `Settings` クラスの中 |
+| Shader | `Shader` 型のフィールド | `Settings` クラスの中 |
+| Threshold など | `float` 型のフィールド | `Settings` クラスの中 |
+
+`Settings` は、Feature の中に入れ子で定義された `[System.Serializable]` のクラスです。Inspector に項目が出るのは、この `Settings` の中身がシリアライズ（保存）されるためです。
+
+```csharp
+public class OutlineRendererFeature : ScriptableRendererFeature
+{
+    [System.Serializable]
+    public class Settings                              // 設定値をまとめる入れ物（クラス）
+    {
+        public RenderPassEvent renderPassEvent = ...;  // ← enum 型の設定値
+        public Shader shader;                          // ← Shader 型の設定値
+        [Range(0f, 0.2f)] public float threshold = 0.02f; // ← float 型の設定値
+    }
+
+    public Settings settings = new Settings();         // Inspector に表示されるのはこの変数
+}
+```
+
+### まとめ
+
+- **クラス**は設計図（`ScriptableRendererFeature`、`ScriptableRenderPass`）。継承して派生クラスを作る。
+- **enum**は選択肢の集まり（`RenderPassEvent`）。値を選んで代入する。
+- **設定値**はクラスの中のフィールド（`renderPassEvent`、`shader` など）。Inspector で編集する。
+
+表の 3 行を「親クラス」「継承元の別クラス」「候補の enum」と読み替えると、分かりやすくなります。
+
 処理の流れは次のとおりです。
 
 ```mermaid
@@ -329,6 +439,7 @@ public class EmptyRendererFeature : ScriptableRendererFeature
 
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
+            Debug.Log("EmptyPass08 executed");   // 確認後に削除してよい
             // CommandBuffer を借りて命令を記録し、最後に実行する
             CommandBuffer cmd = CommandBufferPool.Get();
             using (new ProfilingScope(cmd, s_Sampler))
