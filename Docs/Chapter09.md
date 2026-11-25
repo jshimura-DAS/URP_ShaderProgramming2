@@ -178,6 +178,203 @@ public class OutlinePass : ScriptableRenderPass
     }
 }
 ```
+#### 2.3 OutlinePass（Render Graph 版）のコード解説
+
+このファイルは、Render Graph の仕組みに沿って「輪郭線の描画パス」を定義しています。処理は大きく **(1) 初期化・設定の受け取り**、**(2) リソースの取得と一時テクスチャの宣言**、**(3) パス 1（輪郭線の描画）**、**(4) パス 2（結果の書き戻し）** の 4 段階に分かれます。
+
+#### 2.3.1 全体の構造
+
+```mermaid
+flowchart TD
+    A["コンストラクタ<br/>深度の使用を宣言"] --> B["Setup()<br/>マテリアルと設定を受け取る"]
+    B --> C["RecordRenderGraph()<br/>毎フレーム呼ばれる"]
+    C --> C1["リソースを取得"]
+    C1 --> C2["マテリアルへ設定値を反映"]
+    C2 --> C3["一時テクスチャ _OutlineTemp を宣言"]
+    C3 --> C4["パス1: Outline08<br/>source を読み temp へ描画"]
+    C4 --> C5["パス2: Outline08 Copy<br/>temp を source へ書き戻し"]
+```
+
+---
+
+#### 2.3.2 クラス宣言と PassData
+
+```csharp
+public class OutlinePass : ScriptableRenderPass
+```
+
+- `ScriptableRenderPass` を継承し、URP の描画パスになります。
+- `class PassData` は、**パスに渡す値を入れる箱**です。`RecordRenderGraph` の中で値を入れ、後で `SetRenderFunc` のラムダ式がその箱から値を取り出します。
+
+```csharp
+class PassData
+{
+    public TextureHandle source;
+    public Material material;
+}
+```
+
+- `TextureHandle` は、Render Graph が管理するテクスチャの「引換券」です。実体（GPU メモリ）ではなく、Render Graph 上での参照を表します。
+
+---
+
+#### 2.3.3  コンストラクタ：深度の使用を宣言
+
+```csharp
+public OutlinePass()
+{
+    ConfigureInput(ScriptableRenderPassInput.Depth);
+}
+```
+
+- `ConfigureInput` は、このパスが**深度テクスチャを使う**ことを URP に伝えます。
+- URP は、宣言されたパスが存在する場合にだけ深度テクスチャを生成します。宣言を忘れると、`cameraDepthTexture` が正しく用意されず、輪郭線が出ません。
+- コンストラクタで一度だけ宣言すれば十分です。
+
+---
+
+#### 2.3.4 Setup()：外部からの値の受け取り
+
+```csharp
+public void Setup(Material material, OutlineRendererFeature.Settings settings)
+{
+    _material = material;
+    _settings = settings;
+}
+```
+
+- `OutlineRendererFeature` が毎フレーム呼び出し、マテリアルと設定値を渡します。
+- ここでは値を保存するだけで、描画は行いません。描画は次の `RecordRenderGraph` で行います。
+
+---
+
+#### 2.3.5 RecordRenderGraph()：パスの組み立て
+
+このメソッドは毎フレー呼ばれ、**「何を読み、何に書くか」を Render Graph に登録する**場所です。GPU の描画はまだ行いません。
+
+#### 2.3.6 早期リターンとリソースの取得
+
+```csharp
+if (_material == null) return;
+
+UniversalResourceData resourceData = frameData.Get<UniversalResourceData>();
+```
+
+- マテリアルが無ければ何もせず終わります（シェーダー未設定時の保護）。
+- `frameData`（`ContextContainer`）から、URP のフレーム情報 `UniversalResourceData` を取り出します。ここに、カメラのカラーや深度の `TextureHandle` が入っています。
+
+#### 2.3.7 マテリアルへの設定値の反映
+
+```csharp
+_material.SetColor("_OutlineColor", _settings.outlineColor);
+_material.SetFloat("_Threshold", _settings.threshold);
+_material.SetFloat("_Sharpness", _settings.sharpness);
+_material.SetFloat("_Thickness", _settings.thickness);
+```
+
+- Inspector の値を、シェーダーの Properties の名前（`_OutlineColor` など）に対応させてマテリアルへ書き込みます。
+- コメントにあるとおり、**値はレコード時に反映**します。`SetRenderFunc` の中で `_settings` を参照すると、実行時の値が変わっていた場合に不整合が起きるためです。
+
+#### 2.3.8 入力テクスチャの取得
+
+```csharp
+TextureHandle source = resourceData.activeColorTexture;
+TextureHandle depth  = resourceData.cameraDepthTexture;
+```
+
+- `source`：現在のカメラのカラー（処理対象の画像）。
+- `depth`：カメラの深度テクスチャ。輪郭線の判定に使います。
+
+#### 2.3.9  一時テクスチャの宣言
+
+```csharp
+TextureDesc desc = renderGraph.GetTextureDesc(source);
+desc.name = "_OutlineTemp";
+desc.clearBuffer = false;
+desc.depthBufferBits = DepthBits.None;
+TextureHandle temp = renderGraph.CreateTexture(desc);
+```
+
+| 行 | 意味 |
+| :--- | :--- |
+| `GetTextureDesc(source)` | `source` と同じ解像度・フォーマットの設定をコピーする |
+| `desc.name` | Render Graph Viewer に表示される名前 |
+| `clearBuffer = false` | 毎回クリアしない（上書きされる前提のため不要） |
+| `depthBufferBits = None` | 深度バッファは持たない（色だけでよい） |
+| `CreateTexture` | 一時テクスチャを登録する。解放処理は Render Graph が自動で行う |
+
+`temp` を使うのは、同じテクスチャを「読みながら書く」と結果が壊れるためです。
+
+#### 2.3.10 パス 1：輪郭線の描画（Outline08）
+
+```csharp
+using (var builder = renderGraph.AddRasterRenderPass<PassData>("Outline08", out var passData))
+{
+    passData.source = source;
+    passData.material = _material;
+
+    builder.UseTexture(source);
+    builder.UseTexture(depth);
+    builder.SetRenderAttachment(temp, 0);
+
+    builder.SetRenderFunc((PassData data, RasterGraphContext ctx) =>
+    {
+        Blitter.BlitTexture(ctx.cmd, data.source, new Vector4(1, 1, 0, 0), data.material, 0);
+    });
+}
+```
+
+- `AddRasterRenderPass<PassData>("Outline08", ...)`：ラスター（描画）型のパスを登録します。`out var passData` で、パス専用の箱を受け取ります。
+- `passData` への代入：`SetRenderFunc` で使う値を箱に入れます。
+- `UseTexture(source)` / `UseTexture(depth)`：**読み取る**リソースを宣言します。宣言がないと、依存関係が正しく扱われません。
+- `SetRenderAttachment(temp, 0)`：**書き込む**先を宣言します。`0` は出力スロットの番号です（複数出力の MRT では 1、2 ... と増やします）。
+- `SetRenderFunc`：実際の描画処理を登録します。ここから先のラムダ式は、Render Graph の **Execute** の段階で呼ばれます。
+
+ラムダ式の中身：
+
+```csharp
+Blitter.BlitTexture(ctx.cmd, data.source, new Vector4(1, 1, 0, 0), data.material, 0);
+```
+
+| 引数 | 意味 |
+| :--- | :--- |
+| `ctx.cmd` | GPU 命令を記録するコマンドバッファ |
+| `data.source` | 入力テクスチャ（箱から取り出す） |
+| `new Vector4(1, 1, 0, 0)` | スケールとオフセット（`xy` = 1、`zw` = 0 で全体をそのまま使う） |
+| `data.material` | 輪郭線を計算するシェーダーのマテリアル |
+| `0` | マテリアルのパス番号（シェーダー内の `Pass` の 0 番目） |
+
+このブリットによって、`OutlineFullscreen08.shader` の `Frag` が画面全体のピクセルごとに実行されます。
+
+#### 2.3.11 パス 2：結果の書き戻し（Outline08 Copy）
+
+```csharp
+RenderGraphBlitUtil.AddCopyPass(renderGraph, temp, source, "Outline08 Copy");
+```
+
+- `temp` の結果を、カメラのカラー `source` へ戻します。
+- 処理内容は `RenderGraphBlitUtil` にまとめてあり、マテリアルを渡さないため単純コピーになります（2.4 で解説）。
+- 2 段階に分けるのは、「`source` を読みながら `source` に書く」ことを避けるためです。
+
+---
+
+### 2.3.12 処理の流れのまとめ
+
+```mermaid
+flowchart LR
+    S["source<br/>カメラのカラー"] -->|"読む（パス1）"| O["輪郭線シェーダー<br/>Frag"]
+    D["depth<br/>深度"] -->|"読む（パス1）"| O
+    O -->|"書く"| T["temp<br/>_OutlineTemp"]
+    T -->|"読む（パス2）"| C["コピー"]
+    C -->|"書く"| S
+```
+
+### 2.3.13 注意点
+
+- `RecordRenderGraph` は毎フレーム呼ばれるため、`CreateTexture` や `SetFloat` などの処理は軽量に保つ必要があります。
+- `SetRenderFunc` の中では、`this` のフィールド（`_settings` や `_material`）を参照しないでください。必要な値は `PassData` 経由で渡します。
+- `Blitter.BlitTexture` の第 4 引数 `data.material` と第 5 引数 `0` は、マテリアルのパス指定です。マテリアルを `null` にすると、単純なコピーになります（`RenderGraphBlitUtil` の `else` 側の挙動）。
+
 
 **コードの要点**
 
@@ -410,8 +607,9 @@ UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
 
 ### 4.2 Render Graph の見え方（概念図）
 
+次の SVG は、Render Graph Viewer の見え方を簡略化した概念図です。上の行に実行順のパス、左の列にリソースを並べ、各セルで読み書きを示しています。
 
-![Render Graph の概念図](images/chapter09_rendergraph_viewer.png)
+![Render Graph の概念図](images/chapter09_rendergraph_viewer.svg)
 
 **読み取りのポイント**
 
@@ -644,11 +842,11 @@ flowchart LR
 
 ### 8.3 手順
 
-**手順 1：Lambert09 を開く**
+#### 手順 1：Lambert09 を開く
 
 上の 6.2 の手順で作成済みのものを開きます。
 
-**手順 2：_BaseColor プロパティを追加し、Show In Inspector にする**
+#### 手順 2：_BaseColor プロパティを追加し、Show In Inspector にする
 
 **2-1. プロパティを追加する**
 
@@ -676,7 +874,7 @@ flowchart LR
 2. カラーピッカーが開くので、**HEX** の欄に `FFFFFFFF` と入力する（または A を 255、V を 100 にする）
 3. カラーピッカーを閉じる
 
-**手順 3：Normal Vector ノードを追加し、Space を World にする**
+#### 手順 3：Normal Vector ノードを追加し、Space を World にする
 
 **3-1. ノードを追加する**
 
@@ -693,7 +891,7 @@ flowchart LR
 
 欄の表示が `World` になれば完了です。
 
-**手順 4：Main Light Direction ノードを追加する**
+#### 手順 4：Main Light Direction ノードを追加する
 
 1. Graph エリアの空いている場所で右クリックする
 2. 検索欄に `Main Light Direction` と入力し、候補をクリックする
@@ -702,7 +900,7 @@ flowchart LR
 
 > 候補に出ない場合は、6.6 の Custom Function で代用します（後述の補足を参照）。
 
-**手順 5：Dot Product ノードを追加し、2 つの入力を接続する**
+#### 手順 5：Dot Product ノードを追加し、2 つの入力を接続する
 
 1. 右クリックして検索欄に `Dot Product` と入力し、クリックして配置する
 2. **Normal Vector** の右側の出力ポート（`Out(3)`）から、**Dot Product** の **A(3)** の入力ポートまでドラッグして離す
@@ -710,14 +908,14 @@ flowchart LR
 
 A と B の両方に線がつながれば完了です。
 
-**手順 6：Saturate ノードを追加する**
+#### 手順 6：Saturate ノードを追加する
 
 1. Dot Product の右側の空いている場所で右クリックし、`Saturate` と入力してクリックする
 2. Dot Product の出力ポート **Out(1)**（右端の丸）から、Saturate の入力ポート **In(1)** までドラッグして離す
 
 > Saturate は、負の値を 0 に丸めます。ライトの裏側の面が負の明るさになるのを防ぎます。
 
-**手順 7：Multiply ノードを追加し、_BaseColor と Saturate を接続する**
+#### 手順 7：Multiply ノードを追加し、_BaseColor と Saturate を接続する
 
 1. 右クリックして検索欄に `Multiply` と入力し、クリックして配置する
 2. Blackboard の `_BaseColor` の項目を、Graph エリアの空いている場所へドラッグする。色のノード（`_BaseColor(4)`）が置かれる
@@ -726,7 +924,7 @@ A と B の両方に線がつながれば完了です。
 
 > Blackboard からドラッグすると、プロパティのノードが自動で作られます。
 
-**手順 8：Multiply の結果を Fragment の Base Color に接続する**
+#### 手順 8：Multiply の結果を Fragment の Base Color に接続する
 
 1. **Multiply** の右側の出力ポート **Out(4)** から、**Fragment** の **Base Color(3)** の入力ポートまでドラッグして離す
 
@@ -734,7 +932,7 @@ A と B の両方に線がつながれば完了です。
 
 ![グラフ](images/Chapter09_graph01.png)
 
-**手順 9：プレビューと生成コードを確認する**
+#### 手順 9：プレビューと生成コードを確認する
 
 1. Main Preview（右下）を確認する。ライトの方向に対応した明暗のある球になっていれば成功
 2. ShaderのImportSettingsをクリックし、そのInspectorの **View Generated Shader** を開く
@@ -1126,7 +1324,7 @@ public class WipeController : MonoBehaviour
 
 ---
 
-## 11. まとめ
+## 12. まとめ
 
 - 移行の前に、`URP_COMPATIBILITY_MODE` の削除、`EmptyRendererFeature` の登録解除、`Chapter08/OutlinePass.cs` の削除を行う。同名クラスの重複と、Execute 方式の残存が、コンパイルエラーと描画不良の主な原因になる
 - 輪郭線は、`Execute` の命令を `RecordRenderGraph` の宣言と `SetRenderFunc` の実行に分けることで、Render Graph 版に移行できる
