@@ -1107,23 +1107,7 @@ public class WipeController : MonoBehaviour
 
 ---
 
-## 10. 実習手順
-
-1. **事前準備**：0.1 の確認（`URP_COMPATIBILITY_MODE` の削除、Render Graph の有効化）を行う
-2. **EmptyRendererFeature の登録解除と削除**：0.2 の手順で行う
-3. **OutlinePass の重複解消**：`Chapter08/OutlinePass.cs` を削除する（0.3）
-4. **RenderGraphBlitUtil.cs の作成**：2.4 の内容で `Chapter09/` に作成する（0.4）
-5. **Chapter09/OutlinePass.cs の作成**：2.3 の内容で作成する
-6. **OutlineRendererFeature.cs の修正**：`Dispose` から `_pass?.Dispose();` を削除する（2.5）
-7. **輪郭線の確認**：2.6 の手順で Renderer Data に登録し、輪郭線と Render Graph Viewer の表示を確認する
-8. **Lambert09 の作成**：8.3 の手順で作成し、プレビューと生成コードを確認する
-9. **ワイプの実装**：`WipeFullscreen09.shader`、`WipeRendererFeature.cs`、`WipeController.cs` を作成し、9.5 の手順で登録する
-10. **動作確認**：Space キーでワイプを動かし、Iris と Horizontal の違い、Render Graph Viewer での `Wipe09` の順序（`Outline08` の後）を確認する
-11. **発展課題**：`Wipe Color` に画像を使えるように、Texture2D のプロパティを追加し、覆った部分に画像を表示させる
-
----
-
-## 11. トラブルシューティング
+## 10. トラブルシューティング
 
 | 症状 | 原因と対処 |
 | :--- | :--- |
