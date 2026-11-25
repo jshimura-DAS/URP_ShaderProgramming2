@@ -366,6 +366,7 @@ public class EmptyRendererFeature : ScriptableRendererFeature
 
 1. Project ウィンドウで `Assets/ShaderProgramming/Chapter08/EmptyRendererFeature.cs` が存在することを確認する（ファイル名がクラス名と一致しているか確認する）
 2. Project ウィンドウの検索欄や `Assets/Settings/` を開き、`PC_Renderer.asset` をクリックして選択する
+![](images/SS_Select_PCrenderer.png)
 3. Inspector に `PC_Renderer` の設定が表示されるので、一番下付近の **Add Renderer Feature** ボタンを押す
 4. 表示されたメニューから **EmptyRendererFeature** を選ぶ（一覧に出ない場合は手順 1 のファイル名を確認する）
 5. Inspector に `Empty Renderer Feature` の項目が追加されたことを確認する
