@@ -410,9 +410,8 @@ UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
 
 ### 4.2 Render Graph の見え方（概念図）
 
-次の SVG は、Render Graph Viewer の見え方を簡略化した概念図です。上の行に実行順のパス、左の列にリソースを並べ、各セルで読み書きを示しています。
 
-![Render Graph の概念図](images/chapter09_rendergraph_viewer.svg)
+![Render Graph の概念図](images/chapter09_rendergraph_viewer.png)
 
 **読み取りのポイント**
 
