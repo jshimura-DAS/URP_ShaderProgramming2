@@ -645,11 +645,11 @@ flowchart LR
 
 ### 8.3 手順
 
-#### 手順 1：Lambert09 を開く
+**手順 1：Lambert09 を開く**
 
 上の 6.2 の手順で作成済みのものを開きます。
 
-#### 手順 2：_BaseColor プロパティを追加し、Show In Inspector にする
+**手順 2：_BaseColor プロパティを追加し、Show In Inspector にする**
 
 **2-1. プロパティを追加する**
 
@@ -677,7 +677,7 @@ flowchart LR
 2. カラーピッカーが開くので、**HEX** の欄に `FFFFFFFF` と入力する（または A を 255、V を 100 にする）
 3. カラーピッカーを閉じる
 
-#### 手順 3：Normal Vector ノードを追加し、Space を World にする
+**手順 3：Normal Vector ノードを追加し、Space を World にする**
 
 **3-1. ノードを追加する**
 
@@ -694,7 +694,7 @@ flowchart LR
 
 欄の表示が `World` になれば完了です。
 
-#### 手順 4：Main Light Direction ノードを追加する
+**手順 4：Main Light Direction ノードを追加する**
 
 1. Graph エリアの空いている場所で右クリックする
 2. 検索欄に `Main Light Direction` と入力し、候補をクリックする
@@ -703,7 +703,7 @@ flowchart LR
 
 > 候補に出ない場合は、6.6 の Custom Function で代用します（後述の補足を参照）。
 
-#### 手順 5：Dot Product ノードを追加し、2 つの入力を接続する
+**手順 5：Dot Product ノードを追加し、2 つの入力を接続する**
 
 1. 右クリックして検索欄に `Dot Product` と入力し、クリックして配置する
 2. **Normal Vector** の右側の出力ポート（`Out(3)`）から、**Dot Product** の **A(3)** の入力ポートまでドラッグして離す
@@ -711,14 +711,14 @@ flowchart LR
 
 A と B の両方に線がつながれば完了です。
 
-#### 手順 6：Saturate ノードを追加する
+**手順 6：Saturate ノードを追加する**
 
 1. Dot Product の右側の空いている場所で右クリックし、`Saturate` と入力してクリックする
 2. Dot Product の出力ポート **Out(1)**（右端の丸）から、Saturate の入力ポート **In(1)** までドラッグして離す
 
 > Saturate は、負の値を 0 に丸めます。ライトの裏側の面が負の明るさになるのを防ぎます。
 
-#### 手順 7：Multiply ノードを追加し、_BaseColor と Saturate を接続する
+**手順 7：Multiply ノードを追加し、_BaseColor と Saturate を接続する**
 
 1. 右クリックして検索欄に `Multiply` と入力し、クリックして配置する
 2. Blackboard の `_BaseColor` の項目を、Graph エリアの空いている場所へドラッグする。色のノード（`_BaseColor(4)`）が置かれる
@@ -727,7 +727,7 @@ A と B の両方に線がつながれば完了です。
 
 > Blackboard からドラッグすると、プロパティのノードが自動で作られます。
 
-#### 手順 8：Multiply の結果を Fragment の Base Color に接続する
+**手順 8：Multiply の結果を Fragment の Base Color に接続する**
 
 1. **Multiply** の右側の出力ポート **Out(4)** から、**Fragment** の **Base Color(3)** の入力ポートまでドラッグして離す
 
@@ -735,7 +735,7 @@ A と B の両方に線がつながれば完了です。
 
 ![グラフ](images/Chapter09_graph01.png)
 
-#### 手順 9：プレビューと生成コードを確認する
+**手順 9：プレビューと生成コードを確認する**
 
 1. Main Preview（右下）を確認する。ライトの方向に対応した明暗のある球になっていれば成功
 2. ShaderのImportSettingsをクリックし、そのInspectorの **View Generated Shader** を開く
@@ -1127,7 +1127,7 @@ public class WipeController : MonoBehaviour
 
 ---
 
-## 12. まとめ
+## 11. まとめ
 
 - 移行の前に、`URP_COMPATIBILITY_MODE` の削除、`EmptyRendererFeature` の登録解除、`Chapter08/OutlinePass.cs` の削除を行う。同名クラスの重複と、Execute 方式の残存が、コンパイルエラーと描画不良の主な原因になる
 - 輪郭線は、`Execute` の命令を `RecordRenderGraph` の宣言と `SetRenderFunc` の実行に分けることで、Render Graph 版に移行できる
