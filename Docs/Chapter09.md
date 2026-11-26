@@ -906,13 +906,165 @@ float3 result = saturate(nDotL);                            // Saturate
 
 ### 8.7 Lit で確認する（任意）
 
-Lit Shader Graph を新規に作成し、Master Stack の **Normal（Tangent Space）** に、Normal Map のテクスチャを接続して明暗の変化を確認します。
+Lit Shader Graph の **Normal (Tangent Space)** に法線マップを接続し、凹凸による明暗の変化を Scene で確かめる任意の演習です。Base Color に N·L を掛けず、明暗の計算は URP の Lit に任せます。
 
-1. `Create > Shader Graph > URP > Lit Shader Graph` で `NormalCheck09_Lit` を作成する
-2. 法線マップのテクスチャを `Sample Texture 2D` で読み込み、**Normal (Tangent Space)** へ接続する（Texture Type を Normal map に設定した画像を使う）
-3. Scene でライトを回転させ、凹凸による明暗の変化を確かめる
+### 事前に用意するもの
 
-> この手順では、Base Color に N·L を掛けていません。明暗は URP の Lit が計算します。
+| 項目 | 内容 |
+| :--- | :--- |
+| 法線マップ画像 | PNG などの画像。凹凸のある模様が望ましい（例：`GlidNormal.png` などの既存アセット） |
+| 対象オブジェクト | Scene に置いた Sphere（8.5 で使ったものを流用してよい） |
+| ライト | Scene の Directional Light（回転させて観察する） |
+
+---
+
+### 手順 1：Lit Shader Graph を作成する
+
+1. Project ウィンドウで `Assets/ShaderProgramming/Chapter09/` を開く
+2. フォルダの余白を右クリックし、`Create > Shader Graph > URP > Lit Shader Graph` を選ぶ
+3. 名前の入力欄に `NormalCheck09_Lit` と入力して Enter を押す
+4. `NormalCheck09_Lit` をダブルクリックして Shader Graph エディタを開く
+
+> **確認**：Master Stack に Vertex と Fragment があり、Fragment に Base Color、Metallic、Smoothness、Normal (Tangent Space)、Emission などの入力が並んでいれば、Lit テンプレートが正しく作成されています。
+
+---
+
+### 手順 2：法線マップ画像の Import 設定を確認する
+
+Shader Graph から読むテクスチャは、Import 設定が**法線マップ**になっている必要があります。設定が違うと、法線が正しく解釈されず、明暗が不自然になります。
+
+1. Project ウィンドウで法線マップ画像を選ぶ
+2. Inspector の **Texture Type** が `Normal map` になっていることを確認する
+3. **sRGB (Color Texture)** のチェックが外れていることを確認する（法線は色ではなく数値データのため）
+4. 設定を変えた場合は **Apply** を押す
+
+> **注意**：Texture Type が `Default` のまま使うと、法線の値が正しく変換されず、凹凸が逆に見えたり、ほぼ平坦に見えたりします。
+
+---
+
+### 手順 3：Sample Texture 2D ノードを追加する
+
+1. Graph エリアの空いた場所で右クリックし、検索欄に `Sample Texture 2D` と入力してクリックする
+2. 配置されたノードの右上（または Graph Inspector）で、**Texture** の欄に手順 2 の法線マップ画像を割り当てる
+   - Project から画像を Texture 欄へドラッグ＆ドロップしてもよい
+   - Graph Inspector の Texture 欄が見当たらない場合は、ノード内の丸いボタン（◎）から選ぶ
+
+> **Sample Texture 2D の Type**：ノードの Type（Default、Normal など）は、通常 `Default` のままで構いません。Import 設定で Normal map にしていれば、Shader Graph が正しく扱います。
+
+---
+
+### 手順 4：UV を接続する
+
+Sample Texture 2D は、どの位置の画素を読むかを **UV** で受け取ります。
+
+1. Graph エリアで右クリックし、`UV` ノード（検索欄に `UV` と入力）を追加する
+2. `UV` ノードの出力 **Out(2)** を、Sample Texture 2D の入力 **UV(2)** へつなぐ
+
+> **初学者向け補足**：UV は、テクスチャ上の位置を 0〜1 の座標で表したものです。ここでは何も変換せず、そのまま接続します。
+
+---
+
+### 手順 5：Normal Map 用の変換ノードを追加する
+
+法線マップの RGB 値は、0〜1 の色として保存されています。法線として使うには、**-1〜1 の値へ変換**する必要があります。Shader Graph ではこの変換を **Normal From Texture** ノードで行います。
+
+1. Graph エリアで右クリックし、検索欄に `Normal From Texture` と入力してクリックする
+2. Sample Texture 2D の出力 **RGBA** または **RGB** を、Normal From Texture の入力 **Texture** へつなぐ
+
+> **なぜ変換が必要か**：色（0〜1）と法線（-1〜1）では値の範囲が違います。例えば RGB (0.5, 0.5, 1.0) は、法線では「正面向き」を表します。この変換を省くと、すべての面が上を向いたように誤って計算されます。
+
+**Normal From Texture の役割**
+
+| 入力・出力 | 意味 |
+| :--- | :--- |
+| Texture | 法線マップの画像（Sample Texture 2D の出力） |
+| Strength | 凹凸の強さ。1 が標準、0 で平坦、大きくすると凹凸が強調される |
+| Out | タンジェント空間の法線（Normal (Tangent Space) へ接続する値） |
+
+> 検索で `Normal From Texture` が見つからない場合は、Unity のバージョンによって名称が異なることがあります。`Normal Unpack` や `Normal Strength` などの名称で探してください。
+
+---
+
+### 手順 6：Normal (Tangent Space) へ接続する
+
+1. Normal From Texture の出力 **Out(3)** を、Master Stack の Fragment にある **Normal (Tangent Space)(3)** へつなぐ
+2. 既存の Base Color などは、そのままにしておく（色は白、または既定値でよい）
+
+> **注意**：Normal (Tangent Space) は**接線空間**の値です。ワールド空間の法線（Normal Vector の World）を直接つないではいけません。URP が接線空間からワールド空間へ変換して、ライティングに使います。
+
+---
+
+### 手順 7：Normal Strength を調整する（任意）
+
+1. Normal From Texture の **Strength** の欄に値を入力する（初期値 `1`）
+2. `0` にすると凹凸が消えて平坦に見える。`2` 程度にすると凹凸が強く見える
+
+> **確認の目安**：Strength を 0 → 1 → 2 と変えると、明暗の境界がはっきりしていく様子が見えます。
+
+---
+
+### 手順 8：Main Preview で確認する
+
+1. 右下の Main Preview を見る
+2. 法線マップの模様に応じて、明るい部分と暗い部分が現れていれば成功
+3. 全体が一様な灰色や、模様が見えない場合は、手順 2〜6 の接続と Import 設定を確認する
+
+> Main Preview の光源はプレビュー専用です。Scene での確認が本番になります。
+
+---
+
+### 手順 9：マテリアルを作成して Sphere に割り当てる
+
+1. Project ウィンドウで `NormalCheck09_Lit` を右クリックし、`Create > Material` を選ぶ
+2. 作成されたマテリアルの名前を `NormalCheck09_Lit_Mat` に変更する
+3. Inspector の **Shader** 欄が `Shader Graphs/NormalCheck09_Lit` になっていることを確認する
+4. マテリアルを、Scene の Sphere へドラッグ＆ドロップする
+
+> **補足**：Shader Graph で作ったシェーダーは、必ずマテリアルを経由して使います。シェーダーそのものをオブジェクトに割り当てることはできません。
+
+---
+
+### 手順 10：Scene でライトを動かして確かめる
+
+1. Hierarchy で **Directional Light** を選ぶ
+2. Scene ビューで Rotation を変える（X を 30〜60 程度にすると分かりやすい）
+3. Sphere の凹凸の影が、ライトの向きに応じて移動することを確認する
+
+**観察の例**
+
+| 操作 | 期待する見え方 |
+| :--- | :--- |
+| ライトを真上から当てる | 凹凸の上面が明るく、傾いた面は暗くなる |
+| ライトを横から当てる | 凹凸の片側だけが明るく、反対側が暗くなる |
+| Normal Strength を 0 にする | 凹凸が消え、全体が一様に明るくなる |
+| Normal Strength を大きくする | 凹凸の明暗の差が強くなる |
+
+**明暗が逆のとき**
+
+- 凹凸の山が谷に見える場合は、法線マップ自体の向き（Green チャンネルの反転）が原因のことが多い
+- 作成ツールで Y（緑）を反転して保存されている画像は、凹凸が逆に見えます
+- その場合は、画像の作成元で反転を確認するか、別の法線マップを使ってください
+
+---
+
+### 手順 11：生成コードで確認する（任意）
+
+1. `NormalCheck09_Lit` を選び、Inspector の **View Generated Shader** を開く
+2. `TransformTangentToWorld` や `normalTS` といった接線空間からワールド空間への変換が含まれていることを確認する
+
+> **補足**：ここで、8.4 の `dot(normalWS, lightDir)` が Lit の内部でも使われていることが確認できます。Lit では、この内積が直接見えるわけではなく、URP のライティング関数の中に組み込まれています。
+
+---
+
+### 8.7 のまとめ
+
+| 段階 | 行うこと | 目的 |
+| :--- | :--- | :--- |
+| 準備 | 法線マップの Import 設定（Normal map、sRGB オフ） | 数値として正しく読むため |
+| 接続 | UV → Sample Texture 2D → Normal From Texture → Normal (Tangent Space) | 法線マップを接線空間の法線として渡すため |
+| 確認 | Scene でライトを動かす | 凹凸の明暗が URP によって計算されることを確かめるため |
+
+この演習では、Base Color に N·L を掛けず、Normal の入力だけを与えました。明暗の計算は URP の Lit が行うため、学習者は「入力を与えると、ライティングが URP によって計算される」という役割分担を、実際の見た目から確かめられます。
 
 ### 8.8 確認ポイント
 
