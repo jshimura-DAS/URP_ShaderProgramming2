@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-5382697493346732551
+--- !u!114 &-2760846090756084321
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
@@ -20,8 +20,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Shader Graphs_Lambert09
-  m_Shader: {fileID: -6465566751694194690, guid: 0b730e805b6c7064698ab7eff0fa6f25, type: 3}
+  m_Name: Shader Graphs_NdotLDebug09
+  m_Shader: {fileID: -6465566751694194690, guid: 54977f4620eb4af4e94b64f587a39876, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
